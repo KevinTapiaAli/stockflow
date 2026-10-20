@@ -1,0 +1,97 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum MovementType {
+  IN
+  OUT
+  SALE
+  CANCELLATION
+}
+
+enum SaleStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+model Category {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String    @db.VarChar(100)
+  nameKey     String    @unique @db.VarChar(100)
+  description String    @default("") @db.VarChar(500)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  products    Product[]
+}
+
+model Product {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String   @db.VarChar(150)
+  sku         String   @unique @db.VarChar(50)
+  description String   @default("") @db.VarChar(1000)
+  price       Decimal  @db.Decimal(12, 2)
+  stock       Int      @default(0)
+  minStock    Int      @default(5)
+  active      Boolean  @default(true)
+  categoryId  String   @db.Uuid
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  movements   InventoryMovement[]
+  saleItems   SaleItem[]
+
+  @@index([categoryId])
+  @@index([name])
+}
+
+model InventoryMovement {
+  id         String       @id @default(uuid()) @db.Uuid
+  productId  String       @db.Uuid
+  product    Product      @relation(fields: [productId], references: [id], onDelete: Restrict)
+  type       MovementType
+  quantity   Int
+  reason     String       @db.VarChar(500)
+  saleId     String?      @db.Uuid
+  sale       Sale?        @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  createdAt  DateTime     @default(now())
+
+  @@index([productId, createdAt])
+  @@index([createdAt])
+  @@index([saleId])
+}
+
+model Sale {
+  id                 String              @id @default(uuid()) @db.Uuid
+  customer           String              @db.VarChar(150)
+  total              Decimal             @db.Decimal(14, 2)
+  status             SaleStatus          @default(CONFIRMED)
+  createdAt          DateTime            @default(now())
+  cancelledAt        DateTime?
+  cancellationReason String?             @db.VarChar(500)
+  items              SaleItem[]
+  movements          InventoryMovement[]
+
+  @@index([createdAt])
+  @@index([status])
+}
+
+model SaleItem {
+  id          String  @id @default(uuid()) @db.Uuid
+  saleId      String  @db.Uuid
+  sale        Sale    @relation(fields: [saleId], references: [id], onDelete: Restrict)
+  productId   String  @db.Uuid
+  product     Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  productName String  @db.VarChar(150)
+  sku         String  @db.VarChar(50)
+  quantity    Int
+  unitPrice   Decimal @db.Decimal(12, 2)
+  subtotal    Decimal @db.Decimal(14, 2)
+
+  @@unique([saleId, productId])
+  @@index([productId])
+}

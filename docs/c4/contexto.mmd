@@ -1,0 +1,5 @@
+C4Context
+    title StockFlow — C4 Nivel 1: contexto
+    Person(admin, "Administrador del negocio", "Responsable del catálogo, inventario y ventas.")
+    System(stockflow, "StockFlow", "Sistema web para gestionar categorías, productos, existencias, ventas e historial.")
+    Rel(admin, stockflow, "Administra inventario, registra ventas y consulta indicadores", "HTTP local / navegador")

@@ -1,0 +1,63 @@
+name: stockflow
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-stockflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-stockflow_local_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-stockflow}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks: [stockflow]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    init: true
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-stockflow}:${POSTGRES_PASSWORD:-stockflow_local_2026}@db:5432/${POSTGRES_DB:-stockflow}?schema=public
+      SEED_ON_START: ${SEED_ON_START:-true}
+    expose: ["3000"]
+    networks: [stockflow]
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${GATEWAY_PORT:-8080}:80"
+    environment:
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
+    networks: [stockflow]
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/gateway-health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+networks:
+  stockflow:
+    driver: bridge
+volumes:
+  postgres_data:

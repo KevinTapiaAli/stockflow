@@ -1,0 +1,41 @@
+# envsubst sustituye únicamente CORS_ORIGIN (ver Dockerfile).
+map $http_origin $cors_origin {
+    default "";
+    "${CORS_ORIGIN}" $http_origin;
+}
+server {
+    listen 80;
+    root /usr/share/nginx/html;
+    index index.html;
+    include /etc/nginx/snippets/headers.conf;
+
+    location = /gateway-health {
+        access_log off;
+        default_type application/json;
+        return 200 '{"status":"ok","service":"gateway"}';
+    }
+    location = /api { return 308 /api/; }
+
+    # Swagger tiene recursos JS/CSS: no consumir la cuota de operaciones REST.
+    location ~ ^/api/docs(?:/|$|-json$) {
+        include /etc/nginx/snippets/proxy.conf;
+    }
+    location /api/ {
+        limit_req zone=api_limit burst=40 nodelay;
+        limit_req_status 429;
+        include /etc/nginx/snippets/proxy.conf;
+    }
+    location @unavailable {
+        default_type application/json;
+        return 503 '{"statusCode":503,"message":"Servicio temporalmente no disponible.","requestId":"$request_id"}';
+    }
+    location @limited {
+        include /etc/nginx/snippets/headers.conf;
+        add_header Retry-After 1 always;
+        default_type application/json;
+        return 429 '{"statusCode":429,"message":"Demasiadas solicitudes. Espere un segundo.","requestId":"$request_id"}';
+    }
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

@@ -1,0 +1,17 @@
+C4Container
+    title StockFlow — C4 Nivel 2: contenedores
+    Person(admin, "Administrador", "Usuario local del negocio")
+    System_Boundary(system, "StockFlow") {
+        Container_Boundary(browser, "Navegador del usuario") {
+            Container(frontend, "Frontend", "React + TypeScript + Tailwind", "SPA ejecutada en el navegador; formularios y vistas")
+        }
+        Container_Boundary(docker, "Docker Compose / red bridge stockflow") {
+            Container(gateway, "API Gateway", "Nginx :80", "Publica 127.0.0.1:8080. Sirve frontend compilado; proxy, CORS, logs y límites")
+            Container(backend, "Microservicio", "NestJS + Prisma :3000", "Reglas de negocio, DTO, repositorios, transacciones y OpenAPI")
+            ContainerDb(db, "Base de datos", "PostgreSQL :5432", "Datos persistentes; volumen postgres_data")
+        }
+    }
+    Rel(admin, frontend, "Interactúa", "Navegador")
+    Rel(frontend, gateway, "Descarga HTML/JS/CSS y solicita /api/*", "HTTP :8080")
+    Rel(gateway, backend, "Proxy conserva /api/*", "HTTP :3000 interno")
+    Rel(backend, db, "Consulta y modifica mediante Prisma", "TCP :5432 interno")
